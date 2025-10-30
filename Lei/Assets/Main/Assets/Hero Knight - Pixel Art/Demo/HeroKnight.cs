@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 using System.Collections;
 
 public class HeroKnight : MonoBehaviour
@@ -27,19 +28,50 @@ public class HeroKnight : MonoBehaviour
     private float m_rollDuration = 8.0f / 14.0f;
     private float m_rollCurrentTime;
 
-    // 패링 관련
+    // --- 패링 관련 ---
     private bool isParryActive = false;
     private float parryTimer = 0f;
 
-    void Start()
+    // --- 외부 접근용 ---
+    public bool IsParryActive => isParryActive;
+
+    private void Awake()
     {
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void Start()
+    {
+        // 센서 초기화
         m_animator = GetComponent<Animator>();
         m_body2d = GetComponent<Rigidbody2D>();
-        m_groundSensor = transform.Find("GroundSensor").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorR1 = transform.Find("WallSensor_R1").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorR2 = transform.Find("WallSensor_R2").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorL1 = transform.Find("WallSensor_L1").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorL2 = transform.Find("WallSensor_L2").GetComponent<Sensor_HeroKnight>();
+        m_groundSensor = transform.Find("GroundSensor")?.GetComponent<Sensor_HeroKnight>();
+        m_wallSensorR1 = transform.Find("WallSensor_R1")?.GetComponent<Sensor_HeroKnight>();
+        m_wallSensorR2 = transform.Find("WallSensor_R2")?.GetComponent<Sensor_HeroKnight>();
+        m_wallSensorL1 = transform.Find("WallSensor_L1")?.GetComponent<Sensor_HeroKnight>();
+        m_wallSensorL2 = transform.Find("WallSensor_L2")?.GetComponent<Sensor_HeroKnight>();
+
+        // 씬 로드 이벤트 등록 (Awake가 아니라 Start에서 해야 null 방지)
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // 씬 이동 시 센서 초기화
+        if (m_groundSensor != null)
+        {
+            m_groundSensor.Disable(0.05f);
+            Debug.Log($"[HeroKnight] Scene loaded: {scene.name}, 센서 초기화 완료");
+        }
+        else
+        {
+            Debug.LogWarning($"[HeroKnight] Scene loaded: {scene.name}, GroundSensor 연결 안됨");
+        }
     }
 
     void Update()
@@ -48,18 +80,19 @@ public class HeroKnight : MonoBehaviour
         if (m_rolling) m_rollCurrentTime += Time.deltaTime;
         if (m_rollCurrentTime > m_rollDuration) m_rolling = false;
 
-        // 착지/낙하 판정
-        if (!m_grounded && m_groundSensor.State())
+        // 착지 감지
+        if (!m_grounded && m_groundSensor != null && m_groundSensor.State())
         {
             m_grounded = true;
             m_animator.SetBool("Grounded", true);
         }
-        if (m_grounded && !m_groundSensor.State())
+        if (m_grounded && (m_groundSensor == null || !m_groundSensor.State()))
         {
             m_grounded = false;
             m_animator.SetBool("Grounded", false);
         }
 
+        // 이동 입력
         float inputX = Input.GetAxis("Horizontal");
         if (inputX > 0)
         {
@@ -76,11 +109,11 @@ public class HeroKnight : MonoBehaviour
             m_body2d.linearVelocity = new Vector2(inputX * m_speed, m_body2d.linearVelocity.y);
 
         m_animator.SetFloat("AirSpeedY", m_body2d.linearVelocity.y);
-        m_isWallSliding = (m_wallSensorR1.State() && m_wallSensorR2.State()) ||
-                          (m_wallSensorL1.State() && m_wallSensorL2.State());
+        m_isWallSliding = (m_wallSensorR1 != null && m_wallSensorR2 != null && m_wallSensorR1.State() && m_wallSensorR2.State()) ||
+                          (m_wallSensorL1 != null && m_wallSensorL2 != null && m_wallSensorL1.State() && m_wallSensorL2.State());
         m_animator.SetBool("WallSlide", m_isWallSliding);
 
-        // ↓↓↓ 입력 처리 ↓↓↓
+        // ↓ 입력 처리 ↓
         if (Input.GetKeyDown("e") && !m_rolling)
         {
             m_animator.SetBool("noBlood", m_noBlood);
@@ -121,7 +154,7 @@ public class HeroKnight : MonoBehaviour
             m_grounded = false;
             m_animator.SetBool("Grounded", false);
             m_body2d.linearVelocity = new Vector2(m_body2d.linearVelocity.x, m_jumpForce);
-            m_groundSensor.Disable(0.2f);
+            m_groundSensor?.Disable(0.2f);
         }
 
         // 이동 / 대기
@@ -137,7 +170,7 @@ public class HeroKnight : MonoBehaviour
                 m_animator.SetInteger("AnimState", 0);
         }
 
-        // 패링 판정
+        // 패링 감지
         if (isParryActive)
         {
             Vector2 checkPos = transform.position + Vector3.right * m_facingDirection * 1.0f;
@@ -145,18 +178,16 @@ public class HeroKnight : MonoBehaviour
             if (hit != null)
             {
                 Debug.Log("<color=lime>패링 성공! 적: " + hit.name + "</color>");
+                OnParrySuccess(hit.gameObject);
                 isParryActive = false;
                 m_animator.SetTrigger("CounterAttack");
             }
-
-            Debug.DrawRay(transform.position + Vector3.up * 1.5f,
-                transform.right * m_facingDirection * 1.0f, Color.cyan);
 
             parryTimer += Time.deltaTime;
         }
     }
 
-    // --- 애니메이션 이벤트용 ---
+    // --- 애니메이션 이벤트 ---
     void AE_SlideDust()
     {
         Vector3 spawnPosition = m_facingDirection == 1 ?
@@ -164,12 +195,12 @@ public class HeroKnight : MonoBehaviour
 
         if (m_slideDust != null)
         {
-            GameObject dust = Instantiate(m_slideDust, spawnPosition, gameObject.transform.localRotation);
+            GameObject dust = Instantiate(m_slideDust, spawnPosition, transform.localRotation);
             dust.transform.localScale = new Vector3(m_facingDirection, 1, 1);
         }
     }
 
-    // --- 패링 이벤트 ---
+    // --- 패링 관련 ---
     public void OpenParryWindow()
     {
         isParryActive = true;
@@ -183,10 +214,23 @@ public class HeroKnight : MonoBehaviour
         Debug.Log("<color=yellow>패링 윈도우 종료!</color>");
     }
 
+    public void OnParrySuccess(GameObject enemy)
+    {
+        Debug.Log("<color=orange>패링 반격 데미지 적용!</color>");
+
+        // 이미 쓰던 즉시 추가 데미지(원하면 유지/삭제 선택)
+        EnemyBase enemyBase = enemy.GetComponent<EnemyBase>();
+        if (enemyBase != null)
+            enemyBase.TakeDamage(10);
+
+        // 패링 성공 시 시퀀스(QTE) 시작
+        ParrySequenceSystem.Instance?.Begin(enemy.transform);
+    }
+
+
     public void GuardEnd()
     {
         isParryActive = false;
-        Debug.Log("<color=grey>가드 전체 종료</color>");
     }
 
     // --- 공격 판정 제어 ---
@@ -196,7 +240,7 @@ public class HeroKnight : MonoBehaviour
         if (hitbox != null)
         {
             hitbox.EnableHitbox();
-            Debug.Log("플레이어 공격 판정 ON");
+            Debug.Log("<color=green>플레이어 공격 판정 ON</color>");
         }
     }
 
@@ -206,12 +250,7 @@ public class HeroKnight : MonoBehaviour
         if (hitbox != null)
         {
             hitbox.DisableHitbox();
-            Debug.Log("플레이어 공격 판정 OFF");
+            Debug.Log("<color=red>플레이어 공격 판정 OFF</color>");
         }
-    }
-
-    void Awake()
-    {
-        DontDestroyOnLoad(gameObject);
     }
 }

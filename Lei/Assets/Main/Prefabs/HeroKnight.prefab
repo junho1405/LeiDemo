@@ -173,7 +173,7 @@ GameObject:
   - component: {fileID: 7246562920735794497}
   - component: {fileID: 1562972208752862271}
   - component: {fileID: 271010807859801264}
-  m_Layer: 6
+  m_Layer: 9
   m_Name: GroundSensor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -257,6 +257,7 @@ GameObject:
   - component: {fileID: 6135357469573946415}
   - component: {fileID: 6890298062676418136}
   - component: {fileID: 7359297461026602309}
+  - component: {fileID: 3454236654000644972}
   m_Layer: 6
   m_Name: HeroKnight
   m_TagString: Player
@@ -452,6 +453,23 @@ MonoBehaviour:
   m_rollForce: 6
   m_noBlood: 0
   m_slideDust: {fileID: 1038168246061390451, guid: 8b8c8cc6774fb074cb9139cc631b108e, type: 3}
+--- !u!114 &3454236654000644972
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3059250461821974621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b93cfed1c0ce3514397d26429637ffb2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sequenceLength: 2
+  stepTime: 3
+  successDamage: 40
+  pool: 77000000610000007300000064000000
+  overrideFont: {fileID: 0}
 --- !u!1 &5130395590531429150
 GameObject:
   m_ObjectHideFlags: 0
@@ -627,7 +645,7 @@ GameObject:
   - component: {fileID: 5225745832668242508}
   m_Layer: 6
   m_Name: AttackHitbox
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -705,4 +723,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f595eafce4ef8874eb09ab38a441654d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  damage: 10
+  Damage: 10

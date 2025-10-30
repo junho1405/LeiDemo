@@ -17,6 +17,15 @@ public class EnemyBase : MonoBehaviour
     protected bool isDead = false;
     protected bool isAttacking = false;
 
+    // 체력바용 공개 읽기 전용 값
+    public int CurrentHP => stats != null ? stats.currentHP : 0;
+    public int MaxHP => stats != null ? stats.maxHP : 0;
+
+    // 경직도(스태거) — 기본: 없음(서브클래스에서 override 가능)
+    public virtual bool HasStagger => false;
+    public virtual float CurrentStagger => 0f;
+    public virtual float MaxStagger => 0f;
+
     protected virtual void Start()
     {
         anim = GetComponent<Animator>();
@@ -52,7 +61,7 @@ public class EnemyBase : MonoBehaviour
     {
         if (isDead || player == null) return;
 
-        // ✅ y축 무시한 평면 거리 계산
+        // y축 무시한 평면 거리 계산
         Vector2 enemyPos = new Vector2(transform.position.x, 0);
         Vector2 playerPos = new Vector2(player.position.x, 0);
         float distance = Vector2.Distance(enemyPos, playerPos);
@@ -90,7 +99,7 @@ public class EnemyBase : MonoBehaviour
 
         anim.Play("Goblin_Run");
 
-        // ✅ x축만 추적
+        // x축만 추적
         float dirX = Mathf.Sign(player.position.x - transform.position.x);
         rb.linearVelocity = new Vector2(dirX * stats.moveSpeed, 0);
 
