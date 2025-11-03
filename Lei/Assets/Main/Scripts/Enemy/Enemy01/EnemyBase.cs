@@ -1,10 +1,14 @@
 using UnityEngine;
+using static Balance;
 
 [RequireComponent(typeof(Animator))]
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
 public class EnemyBase : MonoBehaviour
 {
+    [Header("Tier")]
+    public EnemyTier tier = EnemyTier.Normal; // ★ 일반/엘리트/보스 구분
+
     public EnemyStats stats;
     protected Animator anim;
     protected Transform player;
@@ -17,14 +21,15 @@ public class EnemyBase : MonoBehaviour
     protected bool isDead = false;
     protected bool isAttacking = false;
 
-    // 체력바용 공개 읽기 전용 값
     public int CurrentHP => stats != null ? stats.currentHP : 0;
     public int MaxHP => stats != null ? stats.maxHP : 0;
 
-    // 경직도(스태거) — 기본: 없음(서브클래스에서 override 가능)
     public virtual bool HasStagger => false;
     public virtual float CurrentStagger => 0f;
     public virtual float MaxStagger => 0f;
+
+    [Header("Hitbox (AnimationEvent 래퍼용)")]
+    [SerializeField] protected EnemyAttackHitbox attackHitbox;
 
     protected virtual void Start()
     {
@@ -34,13 +39,13 @@ public class EnemyBase : MonoBehaviour
         stats = new EnemyStats();
         stats.Init();
 
-        // Rigidbody 설정
+        if (attackHitbox == null)
+            attackHitbox = GetComponentInChildren<EnemyAttackHitbox>(true);
+
         rb.gravityScale = 0;
         rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         rb.bodyType = RigidbodyType2D.Kinematic;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-
-        // Collider 설정
         col.isTrigger = true;
 
         InvokeRepeating(nameof(FindPlayer), 0f, 1f);
@@ -48,10 +53,10 @@ public class EnemyBase : MonoBehaviour
 
     void FindPlayer()
     {
-        GameObject p = GameObject.FindWithTag("Player");
-        if (p != null)
+        var hk = Object.FindFirstObjectByType<HeroKnight>();
+        if (hk != null)
         {
-            player = p.transform;
+            player = hk.transform;
             CancelInvoke(nameof(FindPlayer));
             Debug.Log($"{gameObject.name} found player: {player.name}");
         }
@@ -61,16 +66,11 @@ public class EnemyBase : MonoBehaviour
     {
         if (isDead || player == null) return;
 
-        // y축 무시한 평면 거리 계산
         Vector2 enemyPos = new Vector2(transform.position.x, 0);
         Vector2 playerPos = new Vector2(player.position.x, 0);
         float distance = Vector2.Distance(enemyPos, playerPos);
 
-        if (isAttacking)
-        {
-            rb.linearVelocity = Vector2.zero;
-            return;
-        }
+        if (isAttacking) { rb.linearVelocity = Vector2.zero; return; }
 
         if (distance <= attackRange)
         {
@@ -99,15 +99,11 @@ public class EnemyBase : MonoBehaviour
 
         anim.Play("Goblin_Run");
 
-        // x축만 추적
         float dirX = Mathf.Sign(player.position.x - transform.position.x);
         rb.linearVelocity = new Vector2(dirX * stats.moveSpeed, 0);
 
-        // 방향 전환
-        if (dirX > 0)
-            transform.localScale = new Vector3(5, 5, 1);
-        else
-            transform.localScale = new Vector3(-5, 5, 1);
+        if (dirX > 0) transform.localScale = new Vector3(5, 5, 1);
+        else transform.localScale = new Vector3(-5, 5, 1);
     }
 
     protected virtual void Attack()
@@ -126,18 +122,17 @@ public class EnemyBase : MonoBehaviour
         Invoke(nameof(EndAttack), 1.0f);
     }
 
-    protected void EndAttack()
-    {
-        isAttacking = false;
-    }
+    protected void EndAttack() { isAttacking = false; }
 
-    public virtual void TakeDamage(int dmg)
+    // ★ 배율 적용: 플레이어의 공격이 들어올 때
+    public virtual void TakeDamage(int rawDamage)
     {
-        stats.TakeDamage(dmg);
+        // 플레이어가 준 피해에 티어별 “받는 피해” 배율 적용
+        int adjusted = Mathf.RoundToInt(rawDamage * Balance.IncomingDamageMultiplier(tier));
+        stats.TakeDamage(adjusted);
         anim.Play("Goblin_Hit");
 
-        if (stats.IsDead())
-            Die();
+        if (stats.IsDead()) Die();
     }
 
     protected virtual void Die()
@@ -148,8 +143,9 @@ public class EnemyBase : MonoBehaviour
         Destroy(gameObject, 2f);
     }
 
-    public void SetPlayer(Transform p)
-    {
-        player = p;
-    }
+    public void SetPlayer(Transform p) { player = p; }
+
+    // --- AnimationEvent 래퍼 ---
+    public void EnableHitbox() => attackHitbox?.EnableHitbox();
+    public void DisableHitbox() => attackHitbox?.DisableHitbox();
 }

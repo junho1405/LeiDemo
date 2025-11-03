@@ -23,8 +23,7 @@ public class PlayerHealth : MonoBehaviour
 
         anim.Play("HeroKnight_Hurt");
 
-        if (stats.IsDead())
-            Die();
+        if (stats.IsDead()) Die();
     }
 
     void Die()

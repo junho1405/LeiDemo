@@ -11,47 +11,42 @@ public class PlayerAttackHitbox : MonoBehaviour
     private void Awake()
     {
         boxCollider = GetComponent<BoxCollider2D>();
-        if (boxCollider == null)
-        {
-            Debug.LogError("BoxCollider2D가 없습니다! AttackHitbox에 추가해주세요.");
-        }
-
-        // 기본은 비활성화 (대기 상태)
-        boxCollider.enabled = false;
+        if (!boxCollider) Debug.LogError("BoxCollider2D가 없습니다! AttackHitbox에 추가해주세요.");
+        if (boxCollider) boxCollider.enabled = false; // 기본 비활성
     }
 
-    // --- AnimationEvent에서 호출됨 ---
     public void EnableHitbox()
     {
-        if (boxCollider == null) return;
-
+        if (!boxCollider) return;
+        if (isActive) return;
         isActive = true;
+
+        boxCollider.enabled = false;
         boxCollider.enabled = true;
         Debug.Log("<color=green>플레이어 공격 판정 ON</color>");
     }
 
     public void DisableHitbox()
     {
-        if (boxCollider == null) return;
-
+        if (!boxCollider) return;
+        if (!isActive) return;
         isActive = false;
+
         boxCollider.enabled = false;
         Debug.Log("<color=red>플레이어 공격 판정 OFF</color>");
     }
 
-    // --- 충돌 감지 ---
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!isActive) return;  // 활성화 상태가 아닐 때 무시
+        if (!isActive) return;
 
         if (other.CompareTag("Enemy"))
         {
-            Debug.Log($"<color=yellow>적 피격! → {other.name}</color>");
-            EnemyBase enemy = other.GetComponent<EnemyBase>();
-
+            EnemyBase enemy = other.GetComponent<EnemyBase>() ?? other.GetComponentInParent<EnemyBase>();
             if (enemy != null)
             {
-                enemy.TakeDamage(Damage);
+                Debug.Log($"<color=yellow>적 피격! → {enemy.gameObject.name}</color>");
+                enemy.TakeDamage(Damage); // ★ 배율 적용은 EnemyBase.TakeDamage 내에서 수행
             }
             else
             {
@@ -61,7 +56,6 @@ public class PlayerAttackHitbox : MonoBehaviour
     }
 
 #if UNITY_EDITOR
-    // --- Scene 뷰에서 공격 범위 시각화 (디버그용) ---
     private void OnDrawGizmos()
     {
         Gizmos.color = isActive ? Color.red : Color.gray;

@@ -5,22 +5,16 @@ public class PlayerStats
 {
     public int maxHP = 100;
     public int currentHP;
-    public int attackPower = 20;
+    public int def = 5;
 
-    public void Init()
-    {
-        currentHP = maxHP;
-    }
+    public void Init() { currentHP = maxHP; }
 
     public void TakeDamage(int dmg)
     {
-        currentHP -= dmg;
-        if (currentHP < 0)
-            currentHP = 0;
+        int finalDamage = Mathf.Max(1, dmg - def);
+        currentHP -= finalDamage;
+        Debug.Log($"[Player] 피해량 {finalDamage} → 남은 HP {currentHP}");
     }
 
-    public bool IsDead()
-    {
-        return currentHP <= 0;
-    }
+    public bool IsDead() => currentHP <= 0;
 }

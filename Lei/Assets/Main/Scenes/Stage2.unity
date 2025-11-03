@@ -119,6 +119,37 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &428360350
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 428360351}
+  m_Layer: 0
+  m_Name: RightSpawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &428360351
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 428360350}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.07, y: -3.65, z: -0.0031810026}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -535,11 +566,12 @@ GameObject:
   - component: {fileID: 861049329}
   - component: {fileID: 861049327}
   - component: {fileID: 861049328}
-  - component: {fileID: 861049326}
   - component: {fileID: 861049325}
   - component: {fileID: 861049324}
+  - component: {fileID: 861049326}
   - component: {fileID: 861049330}
   - component: {fileID: 861049331}
+  - component: {fileID: 861049332}
   m_Layer: 7
   m_Name: Goblin
   m_TagString: Enemy
@@ -632,6 +664,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42efc5444028afc4a9030113cb45003a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  tier: 0
   stats:
     maxHP: 100
     currentHP: 0
@@ -640,6 +673,7 @@ MonoBehaviour:
     moveSpeed: 2
   detectionRange: 5
   attackRange: 1.2
+  attackHitbox: {fileID: 0}
 --- !u!95 &861049327
 Animator:
   serializedVersion: 7
@@ -740,7 +774,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 861049323}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e5e80b4b2656af4b8edf9373c0f8b5d, type: 3}
   m_Name: 
@@ -757,20 +791,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 378cbd82f054e174b938f224cb62e517, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hpWidth: 10
-  hpHeight: 10
-  yOffset: 0.8
-  hpBgColor: {r: 0, g: 0, b: 0, a: 0.65}
-  hpFillColor: {r: 0.2, g: 0.85, b: 0.2, a: 0.95}
-  hpLowColor: {r: 0.95, g: 0.2, b: 0.2, a: 0.95}
-  showStaggerIfAvailable: 1
-  staggerGap: 0.07
-  staggerWidth: 1.6
-  staggerHeight: 0.12
-  staggerBgColor: {r: 0, g: 0, b: 0, a: 0.5}
-  staggerFillColor: {r: 0.95, g: 0.8, b: 0.2, a: 0.95}
+  width: 3
+  height: 0.2
+  yOffset: 2
+  bgColor: {r: 0, g: 0, b: 0, a: 0.65}
+  fillHigh: {r: 0.2, g: 0.85, b: 0.2, a: 0.95}
+  fillLow: {r: 0.95, g: 0.2, b: 0.2, a: 0.95}
+  lowHpThreshold: 0.3
   sortingLayerName: Default
-  sortingOrder: 100
+  sortingOrder: 500
+--- !u!114 &861049332
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 861049323}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60b3faf966c324a4e81f665bda6eb22e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tier: 0
+  stats:
+    maxHP: 100
+    currentHP: 0
+    atk: 5
+    def: 10
+    moveSpeed: 2.5
+  detectionRange: 2.5
+  attackRange: 2.5
+  attackHitbox: {fileID: 753079690}
 --- !u!1 &1008384027
 GameObject:
   m_ObjectHideFlags: 0
@@ -903,7 +954,7 @@ Transform:
   m_GameObject: {fileID: 1114622575}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.31, y: 0.62545, z: -0.0031810026}
+  m_LocalPosition: {x: -10.77, y: 0.62545, z: -0.0031810026}
   m_LocalScale: {x: 1, y: 11.2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1543,6 +1594,7 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 1513962540}
+  - {fileID: 428360351}
   - {fileID: 1114622578}
   - {fileID: 1961518698}
   - {fileID: 578089602}

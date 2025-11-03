@@ -1,154 +1,113 @@
-using UnityEngine;
+Ôªøusing UnityEngine;
 
 [DisallowMultipleComponent]
 public class EnemyHealthBar : MonoBehaviour
 {
-    [Header("HP Bar Layout")]
-    public float hpWidth = 1.6f;
-    public float hpHeight = 0.18f;
-    public float yOffset = 0.8f;              // ∏”∏Æ ¿ß∑Œ ∂ÁøÏ¥¬ ¡§µµ
+    [Header("Layout")]
+    public float width = 3f;
+    public float height = 0.3f;
+    public float yOffset = 2f;
 
-    [Header("HP Colors")]
-    public Color hpBgColor = new Color(0f, 0f, 0f, 0.65f);
-    public Color hpFillColor = new Color(0.2f, 0.85f, 0.2f, 0.95f);
-    public Color hpLowColor = new Color(0.95f, 0.2f, 0.2f, 0.95f); // 30% ¿Ã«œ
-
-    [Header("Stagger Bar Layout")]
-    public bool showStaggerIfAvailable = true;
-    public float staggerGap = 0.07f;          // HPπŸ æ∆∑°∑Œ ∞£∞›
-    public float staggerWidth = 1.6f;
-    public float staggerHeight = 0.12f;
-
-    [Header("Stagger Colors")]
-    public Color staggerBgColor = new Color(0f, 0f, 0f, 0.5f);
-    public Color staggerFillColor = new Color(0.95f, 0.8f, 0.2f, 0.95f);
+    [Header("Colors")]
+    public Color bgColor = new Color(0f, 0f, 0f, 0.65f);
+    public Color fillHigh = new Color(0.20f, 0.85f, 0.20f, 0.95f);
+    public Color fillLow = new Color(0.95f, 0.20f, 0.20f, 0.95f);
+    public float lowHpThreshold = 0.30f;
 
     [Header("Sorting")]
     public string sortingLayerName = "Default";
-    public int sortingOrder = 100;     // ¿˚ Ω∫«¡∂Û¿Ã∆Æ∫∏¥Ÿ ¿ß∑Œ
+    public int sortingOrder = 100;
 
-    private SpriteRenderer _hpBg, _hpFill;
-    private SpriteRenderer _sgBg, _sgFill; // stagger
-    private EnemyBase _enemy;
-    private Transform _root;
-    private Sprite _pixel; // 1x1 Ω∫«¡∂Û¿Ã∆Æ
+    Transform root;
+    SpriteRenderer srBG;
+    SpriteRenderer srFill;
+    Sprite pxMid;
+    Sprite pxLeft;
+
+    EnemyBase enemy;
+    SpriteRenderer enemySR;
+    Collider2D enemyCol;
 
     void Awake()
     {
-        _enemy = GetComponent<EnemyBase>();
-        if (_enemy == null)
-        {
-            Debug.LogWarning("[EnemyHealthBar] EnemyBase∞° « ø‰«’¥œ¥Ÿ.");
-            enabled = false;
-            return;
-        }
+        enemy = GetComponent<EnemyBase>() ?? GetComponentInParent<EnemyBase>() ?? GetComponentInChildren<EnemyBase>();
+        enemySR = GetComponent<SpriteRenderer>() ?? GetComponentInChildren<SpriteRenderer>();
+        enemyCol = GetComponent<Collider2D>() ?? GetComponentInChildren<Collider2D>();
 
-        // 1x1 »Úªˆ ≈ÿΩ∫√≥∑Œ Ω∫«¡∂Û¿Ã∆Æ ª˝º∫
-        var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-        tex.SetPixel(0, 0, Color.white);
-        tex.Apply();
-        _pixel = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 100f);
+        if (enemySR != null) { sortingLayerName = enemySR.sortingLayerName; sortingOrder = enemySR.sortingOrder + 10; }
 
-        // ∑Á∆Æ
-        _root = new GameObject("Bars").transform;
-        _root.SetParent(transform, false);
+        // ‚òÖ FullRectÎ°ú ÏÉùÏÑ±Ìï¥ ÌÉÄÏùºÎßÅ Í≤ΩÍ≥† Ï†úÍ±∞
+        var texMid = new Texture2D(1, 1, TextureFormat.RGBA32, false); texMid.SetPixel(0, 0, Color.white); texMid.Apply();
+        var texLeft = new Texture2D(1, 1, TextureFormat.RGBA32, false); texLeft.SetPixel(0, 0, Color.white); texLeft.Apply();
 
-        // HP BG
-        _hpBg = NewSprite("HP_BG", hpBgColor, sortingOrder);
-        // HP Fill
-        _hpFill = NewSprite("HP_Fill", hpFillColor, sortingOrder + 1);
+        pxMid = Sprite.Create(texMid, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+        pxLeft = Sprite.Create(texLeft, new Rect(0, 0, 1, 1), new Vector2(0.0f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
 
-        // Stagger BG/Fill (¿œ¥‹ ∏∏µÈæÓµŒ∞Ì «•Ω√∏¶ ≈‰±€)
-        _sgBg = NewSprite("ST_BG", staggerBgColor, sortingOrder);
-        _sgFill = NewSprite("ST_Fill", staggerFillColor, sortingOrder + 1);
+        root = new GameObject("HB_Root").transform;
+        root.SetParent(transform, false);
 
-        LayoutAll();
-        UpdateBarsImmediate();
+        // ÏÇ¨Ïù¥Ï¶à Ï†úÏñ¥ ÏúÑÌï¥ Sliced ÏÇ¨Ïö© (FullRectÎ°ú Í≤ΩÍ≥† Ìï¥Í≤∞Îê®)
+        srBG = NewSR("HP_BG", bgColor, sortingOrder, pxMid, SpriteDrawMode.Sliced);
+        srFill = NewSR("HP_Fill", fillHigh, sortingOrder + 1, pxLeft, SpriteDrawMode.Sliced);
+
+        LayoutStatic();
+        UpdateBarImmediate();
     }
 
-    SpriteRenderer NewSprite(string name, Color color, int order)
+    SpriteRenderer NewSR(string n, Color c, int order, Sprite sprite, SpriteDrawMode mode)
     {
-        var sr = new GameObject(name).AddComponent<SpriteRenderer>();
-        sr.transform.SetParent(_root, false);
-        sr.sprite = _pixel;
-        sr.color = color;
+        var go = new GameObject(n);
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.color = c;
         sr.sortingLayerName = sortingLayerName;
         sr.sortingOrder = order;
+        sr.drawMode = mode;
         return sr;
     }
 
     void LateUpdate()
     {
-        if (_enemy == null) return;
-        LayoutAll();
-        UpdateBarsImmediate();
+        Vector3 p = transform.lossyScale;
+        const float eps = 1e-6f;
+        root.localScale = new Vector3(1f / Mathf.Max(Mathf.Abs(p.x), eps),
+                                      1f / Mathf.Max(Mathf.Abs(p.y), eps), 1f);
+        root.rotation = Quaternion.identity;
+
+        root.position = new Vector3(transform.position.x, GetTopY() + yOffset, 0f);
+
+        UpdateBarImmediate();
     }
 
-    void LayoutAll()
+    float GetTopY()
     {
-        // ±‚¡ÿ ≥Ù¿Ã(∏”∏Æ ¿ß)
-        float top = transform.position.y;
-        var col = GetComponent<Collider2D>();
-        if (col != null) top = col.bounds.max.y;
-        else
-        {
-            var sr = GetComponent<SpriteRenderer>();
-            if (sr != null) top = sr.bounds.max.y;
-        }
-        _root.position = new Vector3(transform.position.x, top + yOffset, 0f);
-
-        // HP ≈©±‚/¿ßƒ°
-        _hpBg.transform.localScale = new Vector3(hpWidth, hpHeight, 1f);
-        _hpFill.transform.localScale = new Vector3(hpWidth, hpHeight, 1f);
-        _hpBg.transform.localPosition = Vector3.zero;
-        _hpFill.transform.localPosition = Vector3.zero;
-
-        // Stagger ≈©±‚/¿ßƒ° (HP æ∆∑°∑Œ)
-        bool showStagger = showStaggerIfAvailable && _enemy.HasStagger && _enemy.MaxStagger > 0.01f;
-        _sgBg.gameObject.SetActive(showStagger);
-        _sgFill.gameObject.SetActive(showStagger);
-
-        if (showStagger)
-        {
-            Vector3 below = new Vector3(0f, -staggerGap - (hpHeight * 0.5f) - (staggerHeight * 0.5f), 0f);
-            _sgBg.transform.localScale = new Vector3(staggerWidth, staggerHeight, 1f);
-            _sgFill.transform.localScale = new Vector3(staggerWidth, staggerHeight, 1f);
-            _sgBg.transform.localPosition = below;
-            _sgFill.transform.localPosition = below;
-        }
+        if (enemyCol != null) return enemyCol.bounds.max.y;
+        if (enemySR != null) return enemySR.bounds.max.y;
+        return transform.position.y;
     }
 
-    void UpdateBarsImmediate()
+    void LayoutStatic()
     {
-        // ----- HP -----
-        float hpMax = Mathf.Max(1, _enemy.MaxHP);
-        float hpRatio = Mathf.Clamp01(_enemy.CurrentHP / hpMax);
+        srBG.size = new Vector2(width, height);
+        srBG.transform.localPosition = Vector3.zero;
 
-        _hpFill.color = (hpRatio <= 0.3f) ? hpLowColor : hpFillColor;
+        srFill.transform.localPosition = new Vector3(-width * 0.5f, 0f, 0f);
+        srFill.size = new Vector2(width, height);
+    }
 
-        float hpFull = hpWidth;
-        float hpCur = Mathf.Max(0f, hpFull * hpRatio);
-        _hpFill.transform.localScale = new Vector3(hpCur, hpHeight, 1f);
-        _hpFill.transform.localPosition = new Vector3((hpCur - hpFull) * 0.5f, 0f, 0f);
-
-        // ----- STAGGER -----
-        bool showStagger = showStaggerIfAvailable && _enemy.HasStagger && _enemy.MaxStagger > 0.01f;
-        if (showStagger)
+    void UpdateBarImmediate()
+    {
+        float maxHP = 100f, curHP = 100f;
+        if (enemy != null && enemy.stats != null)
         {
-            float sgMax = Mathf.Max(0.01f, _enemy.MaxStagger);
-            float sgRatio = Mathf.Clamp01(_enemy.CurrentStagger / sgMax);
-
-            float sgFull = staggerWidth;
-            float sgCur = Mathf.Max(0f, sgFull * sgRatio);
-            _sgFill.transform.localScale = new Vector3(sgCur, staggerHeight, 1f);
-            _sgFill.transform.localPosition = new Vector3((sgCur - sgFull) * 0.5f, _sgFill.transform.localPosition.y, 0f);
+            maxHP = Mathf.Max(1, enemy.stats.maxHP);
+            curHP = Mathf.Clamp(enemy.stats.currentHP, 0, enemy.stats.maxHP);
         }
+        float ratio = Mathf.Clamp01(curHP / maxHP);
 
-        // ªÁ∏¡Ω√ ¡¶∞≈
-        if (_enemy.CurrentHP <= 0 && _root != null)
-        {
-            Destroy(_root.gameObject);
-            enabled = false;
-        }
+        srFill.color = (ratio <= lowHpThreshold) ? fillLow : fillHigh;
+        srFill.size = new Vector2(width * ratio, height);
+
+        if (!root.gameObject.activeSelf) root.gameObject.SetActive(true);
     }
 }
