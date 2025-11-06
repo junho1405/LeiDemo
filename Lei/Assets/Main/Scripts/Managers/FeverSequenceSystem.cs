@@ -28,17 +28,25 @@ public class FeverSequenceSystem : MonoBehaviour
 
     // --- 내부 상태 ---
     private EnemyBase currentTarget;
-    private float feverRemain = 0f;  // 전체 피버 잔여 시간(초)
+
+    // ✅ 전체 피버 타이머(10초 등) — 시작 시 고정, 절대 리셋되지 않음
+    private float feverTotal = 0f;
+    private float feverRemain = 0f;
+
     private bool running = false;
 
     // 왼쪽부터만 유효 입력
     private readonly List<KeyCode> seq = new List<KeyCode>();
-    private float stepTimer = 0f;     // 현재 스텝 제한시간
+
+    // 스텝(키 하나) 제한시간 — 성공 시에만 리셋. 전체 타이머와는 별개
+    private float stepTimer = 0f;
 
     // --- UI ---
     private Canvas canvas;
     private Text titleText;
     private Text seqText;
+
+    // ✅ 이 바는 "전체 피버 남은 시간"만 표시한다
     private Image timerBar;
 
     void Awake()
@@ -65,7 +73,11 @@ public class FeverSequenceSystem : MonoBehaviour
         if (target == null) return;
 
         currentTarget = target;
-        feverRemain = Mathf.Max(0.1f, durationSeconds);
+
+        // ✅ 전체 타이머 고정값 저장(예: 10초). 이후 절대 리셋하지 않음
+        feverTotal = Mathf.Max(0.1f, durationSeconds);
+        feverRemain = feverTotal;
+
         running = true;
 
         BuildInitialSequence();
@@ -77,7 +89,7 @@ public class FeverSequenceSystem : MonoBehaviour
         EnsureUI();
         ShowUI();
         RenderSequence();
-        UpdateTimerBar(1f);
+        UpdateTimerBar(1f); // 시작 시 가득찬 상태
 
         Debug.Log("<color=#FFD700>[FEVER] 시작</color>");
     }
@@ -100,7 +112,7 @@ public class FeverSequenceSystem : MonoBehaviour
             Debug.Log("<color=#00FFAA>[FEVER] 종료</color>");
     }
 
-    // ✅ 외부(EnemyBase)에서 적 사망 시 강제 종료용
+    // 외부(EnemyBase)에서 적 사망 시 강제 종료용
     public void ForceStopFeverBy(EnemyBase target)
     {
         if (!running) return;
@@ -112,7 +124,7 @@ public class FeverSequenceSystem : MonoBehaviour
     {
         if (!running) return;
 
-        // 전체 피버 잔여 시간
+        // ✅ 전체 피버 잔여 시간(절대 리셋 없음)
         feverRemain -= Time.unscaledDeltaTime;
         if (feverRemain <= 0f)
         {
@@ -120,16 +132,12 @@ public class FeverSequenceSystem : MonoBehaviour
             return;
         }
 
-        // 스텝 제한시간
-        stepTimer -= Time.unscaledDeltaTime;
-        UpdateTimerBar(Mathf.Clamp01(stepTimer / stepTime));
+        // ✅ 전체 타이머 바를 갱신(시퀀스 성공과 무관하게 감소)
+        float tRemain = (feverTotal > 0f) ? Mathf.Clamp01(feverRemain / feverTotal) : 0f;
+        UpdateTimerBar(tRemain);
 
-        if (stepTimer <= 0f)
-        {
-            // 스텝 타임아웃 → 피버 종료
-            StopFever();
-            return;
-        }
+        // 스텝 제한시간(성공 시에만 리셋)
+        stepTimer -= Time.unscaledDeltaTime;
 
         // 입력 처리: 반드시 '왼쪽(첫 요소)'만 정답. 틀린 키는 '무시'
         if (Input.anyKeyDown && seq.Count > 0)
@@ -151,14 +159,22 @@ public class FeverSequenceSystem : MonoBehaviour
 
                 if (pressed == need)
                 {
-                    // ✅ 성공: 데미지 적용 → 첫 요소 삭제 → 뒤에 새 랜덤 추가 → 타이머 리셋
-                    OnStepSuccess();
+                    OnStepSuccess(); // 성공 시 스텝 타이머만 리셋
                 }
                 else
                 {
-                    // ❌ 실패: "무시" 규칙. 데미지/삭제/리셋 없음.
+                    // 실패: 무시(대미지/삭제/리셋 없음). 전체 타이머는 계속 흐름.
                 }
             }
+        }
+
+        // 스텝 타이머가 0 이하가 되면, 요구사항에 따라 동작 결정
+        // - 현재 정책: "페널티 없이 계속 시도 가능"을 원하면, 아래 리셋만 수행(피버 유지)
+        // - 만약 스텝 타임아웃으로 피버를 끊고 싶다면 StopFever() 호출로 교체
+        if (stepTimer <= 0f)
+        {
+            // 스텝 타임아웃 → 커서를 강제로 초기화하지 않고, 다시 입력할 수 있도록 스텝 타이머만 재충전
+            stepTimer = stepTime;
         }
     }
 
@@ -172,8 +188,9 @@ public class FeverSequenceSystem : MonoBehaviour
         if (seq.Count > 0) seq.RemoveAt(0);
         seq.Add(RandomKey());
 
-        // 타이머 리셋 & 렌더
+        // ✅ 성공 시에는 스텝 타이머만 리셋 (전체 피버 타이머는 리셋하지 않음)
         stepTimer = stepTime;
+
         RenderSequence();
     }
 
@@ -225,6 +242,7 @@ public class FeverSequenceSystem : MonoBehaviour
         timerBar.color = accent;
 
         var rt = bar.GetComponent<RectTransform>();
+        // 화면 하단보다 약간 위쪽(기존 위치 유지)
         rt.anchorMin = new Vector2(0.25f, 0.60f);
         rt.anchorMax = new Vector2(0.75f, 0.63f);
         rt.offsetMin = Vector2.zero;
@@ -270,6 +288,7 @@ public class FeverSequenceSystem : MonoBehaviour
         seqText.text = sb.ToString();
     }
 
+    // ✅ 전체 타이머 바(피버 잔여 시간)만 갱신
     private void UpdateTimerBar(float t01)
     {
         if (timerBar == null) return;

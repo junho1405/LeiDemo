@@ -1025,8 +1025,11 @@ MonoBehaviour:
   faceToTarget: 1
   attackTriggerName: Attack1
   runBoolName: isRunning
+  attackStateName: 
   attackCooldown: 1.2
   attackAnimMaxTime: 1
+  attackUninterruptible: 1
+  lockFacingDuringAttack: 1
   tier: 0
   stats: {fileID: 0}
   health: {fileID: 0}
@@ -1074,8 +1077,11 @@ MonoBehaviour:
   faceToTarget: 1
   attackTriggerName: Skeleton_Attack1
   runBoolName: isRunning
+  attackStateName: 
   attackCooldown: 2
   attackAnimMaxTime: 1
+  attackUninterruptible: 1
+  lockFacingDuringAttack: 1
   tier: 2
   stats: {fileID: 1010815520}
   health: {fileID: 0}
