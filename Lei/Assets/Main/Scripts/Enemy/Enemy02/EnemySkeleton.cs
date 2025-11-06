@@ -1,111 +1,53 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 [DisallowMultipleComponent]
 public class EnemySkeleton : EnemyBase
 {
-    [Header("Skeleton Tuning")]
+    [Header("Skeleton Move Speed")]
     public float walkSpeed = 1.5f;
-
-    [Header("Detection / Attack")]
-    public float verticalTolerance = 2.0f; // ÇÃ·¹ÀÌ¾î¿ÍÀÇ ³ôÀÌ Â÷ÀÌ Çã¿ë ¹üÀ§
 
     protected override void Awake()
     {
         base.Awake();
-        tier = EnemyTier.Boss;                 // º¸½º Ãë±Þ
-        attackTriggerName = "Skeleton_Attack1"; // ½ºÄÌ·¹Åæ Àü¿ë Æ®¸®°Å¸í
+        tier = EnemyTier.Boss; // ë³´ìŠ¤ë¡œ ì·¨ê¸‰
     }
 
     public override void Idle()
     {
-        if (isAttacking || isDead) return;
-        if (anim) anim.Play("Skeleton_Idle");
         SetRun(false);
+        if (animator != null) animator.Play("Skeleton_Idle");
     }
 
     public override void MoveTowardsPlayer()
     {
-        if (!player || isDead || isAttacking) return;
+        if (target == null) return;
+        if (health != null && health.IsDead) return;
 
-        // ¼öÆò/¼öÁ÷ °Å¸® ºÐ¸® °è»ê
-        float distX = Mathf.Abs(player.position.x - transform.position.x);
-        float distY = Mathf.Abs(player.position.y - transform.position.y);
-
-        // ¼öÁ÷ ³ôÀÌ Â÷ÀÌ°¡ ³Ê¹« Å©¸é °ø°ÝÇÏÁö ¾ÊÀ½
-        if (distY > verticalTolerance)
-        {
-            Idle();
-            return;
-        }
-
-        // °ø°Ý »ç°Å¸® ¾È ¡æ ÀÌµ¿ ¸ØÃß°í °ø°Ý
-        if (distX <= attackRange)
-        {
-            rb.linearVelocity = Vector2.zero;
-            SetRun(false);
-            Attack();
-            return;
-        }
-
-        // °ø°Ý »ç°Å¸® ¹Û ¡æ ÀÌµ¿
-        float dir = Mathf.Sign(player.position.x - transform.position.x);
+        float dir = Mathf.Sign(target.position.x - transform.position.x);
         rb.linearVelocity = new Vector2(dir * walkSpeed, rb.linearVelocity.y);
-        if (anim) anim.Play("Skeleton_Walk");
-        FaceToTargetIfNeeded();
+
+        if (animator != null) animator.Play("Skeleton_Walk");
+
+        if (Vector2.Distance(target.position, transform.position) <= attackRange)
+            Attack();
     }
 
     public override void Attack()
     {
-        if (isDead || isAttacking) return;
-        StartCoroutine(AttackRoutine()); // EnemyBase °ø°Ý ·çÆ¾ »ç¿ë (ÄðÅ¸ÀÓ/»óÅÂ ÀÏ°ý °ü¸®)
+        if (health != null && health.IsDead) return;
+        if (isAttacking) return;
+
+        isAttacking = true;
+        if (animator != null) animator.Play("Skeleton_Attack1", 0, 0f);
+        // AnimationEvent: EnableHitbox / DisableHitbox / EndAttack
     }
 
-    protected override void Update()
-    {
-        if (isDead) return;
-
-        if (player == null)
-        {
-            Idle();
-            return;
-        }
-
-        // ¼öÆò/¼öÁ÷ °Å¸® °è»ê
-        float distX = Mathf.Abs(player.position.x - transform.position.x);
-        float distY = Mathf.Abs(player.position.y - transform.position.y);
-
-        // Å½Áö ¹üÀ§ ¹Û
-        if (distX > detectionRange)
-        {
-            Idle();
-            return;
-        }
-
-        // °ø°Ý ÁßÀÌ¸é ¹æÇâ¸¸ À¯Áö
-        if (isAttacking)
-        {
-            FaceToTargetIfNeeded();
-            return;
-        }
-
-        // ¼öÁ÷ ³ôÀÌ Â÷ÀÌ°¡ Å©¸é ´ë±â
-        if (distY > verticalTolerance)
-        {
-            Idle();
-            return;
-        }
-
-        // ÀÌµ¿/°ø°Ý Ã³¸®
-        MoveTowardsPlayer();
-    }
-
-    // ¡Ú Á¢±Ù ÁöÁ¤ÀÚ ¼öÁ¤: base°¡ public virtual Die()ÀÌ¹Ç·Î public override·Î ¸ÂÃã
-    public override void Die()
+    protected override void Die()
     {
         base.Die();
-        if (anim) anim.Play("Skeleton_Death", 0, 0f);
+        if (animator != null) animator.Play("Skeleton_Death", 0, 0f);
         rb.simulated = false;
         var col = GetComponent<Collider2D>();
-        if (col) col.enabled = false;
+        if (col != null) col.enabled = false;
     }
 }

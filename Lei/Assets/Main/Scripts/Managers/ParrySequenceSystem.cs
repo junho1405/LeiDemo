@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,15 +11,15 @@ public class ParrySequenceSystem : MonoBehaviour
     [Header("Sequence Settings")]
     public int sequenceLength = 4;
     public float stepTime = 0.8f;
-    public int successDamage = 40;          // ÆĞ¸µ ¼º°ø ½Ã Æ®·ç ´ë¹ÌÁö
-    public float staggerMultiplier = 1.5f;  // °æÁ÷µµ °¨¼Ò = successDamage * multiplier
+    public int successDamage = 40;
+    public float staggerDamage = 25f;   // âœ… íŒ¨ë§ ì„±ê³µ ì‹œ ê²½ì§ë„ ê°ì†ŒëŸ‰
     public KeyCode[] pool = new KeyCode[] { KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D };
 
     [Header("UI")]
-    [Tooltip("ÁöÁ¤ ½Ã ÀÌ ÆùÆ®¸¦ »ç¿ëÇÕ´Ï´Ù. ºñ¿öµÎ¸é LegacyRuntime.ttf ºôÆ®ÀÎÀ» »ç¿ëÇÕ´Ï´Ù.")]
+    [Tooltip("ì§€ì • ì‹œ ì´ í°íŠ¸ë¥¼ ì‚¬ìš©í•©ë‹ˆë‹¤. ë¹„ì›Œë‘ë©´ LegacyRuntime.ttf ë¹ŒíŠ¸ì¸ì„ ì‚¬ìš©í•©ë‹ˆë‹¤.")]
     public Font overrideFont;
 
-    // ³»ºÎ »óÅÂ
+    // ë‚´ë¶€ ìƒíƒœ
     private readonly List<KeyCode> _seq = new List<KeyCode>();
     private int _cursor = 0;
     private float _timer = 0f;
@@ -86,13 +86,16 @@ public class ParrySequenceSystem : MonoBehaviour
         }
     }
 
+    // ---------------------------
+    // âœ… ì‹œí€€ìŠ¤ ì‹œì‘
+    // ---------------------------
     public void Begin(Transform target, int length = -1)
     {
         if (_running) StopSequence(false);
 
-        EnsureUI(); // ÆùÆ®/Äµ¹ö½º º¸Àå
-        _currentTarget = target;
+        EnsureUI(); // í˜¹ì‹œ ìƒì„± ì‹¤íŒ¨í–ˆìœ¼ë©´ ì¬ë³´ì¥
 
+        _currentTarget = target;
         int len = (length > 0) ? length : sequenceLength;
 
         BuildSequence(len);
@@ -100,12 +103,11 @@ public class ParrySequenceSystem : MonoBehaviour
         _timer = stepTime;
         _running = true;
 
-        Time.timeScale = 0f; // ½ÃÄö½º Áß ÀÏ½ÃÁ¤Áö(¾ğ½ºÄÉÀÏµå Å¸ÀÌ¸Ó·Î ÁøÇà)
+        Time.timeScale = 0f;
 
         ShowUI();
         RenderSequenceProgress();
         UpdateTimerBar(1f);
-        Debug.Log("<color=#00FFFF>[ParrySequence] ½ÃÀÛ</color>");
     }
 
     public void ForceStop()
@@ -113,8 +115,9 @@ public class ParrySequenceSystem : MonoBehaviour
         if (_running) StopSequence(false);
     }
 
-    // ================= ³»ºÎ ±¸Çö =================
-
+    // ---------------------------
+    // âœ… ì‹œí€€ìŠ¤ ì¢…ë£Œ (ì„±ê³µ/ì‹¤íŒ¨)
+    // ---------------------------
     private void StopSequence(bool success)
     {
         _running = false;
@@ -126,24 +129,20 @@ public class ParrySequenceSystem : MonoBehaviour
             var enemy = _currentTarget.GetComponent<EnemyBase>();
             if (enemy != null)
             {
-                // ¡Ú ÆĞ¸µ ¼º°ø: Æ®·ç ´ë¹ÌÁö + (ÆĞ¸µ Àü¿ë) °æÁ÷µµ °¨¼Ò
-                enemy.TakeTrueDamage(successDamage, staggerMultiplier);
-                Debug.Log($"<color=#00FF99>[ParrySequence] ¼º°ø ¡æ TrueDamage {successDamage}, Stagger x{staggerMultiplier}</color>");
+                // âœ… íŒ¨ë§ ì„±ê³µ â†’ íŠ¸ë£¨ë°ë¯¸ì§€ + ê²½ì§ë„ ê°ì†Œ
+                enemy.TakeParryDamage(successDamage, staggerDamage);
+
+                Debug.Log($"<color=#00E5FF>[PARRY SUCCESS] Damage {successDamage}, Stagger {staggerDamage}</color>");
             }
-            else
-            {
-                Debug.Log("<color=orange>[ParrySequence] ¼º°øÇßÁö¸¸ EnemyBase ¾øÀ½</color>");
-            }
-        }
-        else
-        {
-            Debug.Log("<color=#FF8888>[ParrySequence] ½ÇÆĞ</color>");
         }
 
         _currentTarget = null;
         _seq.Clear();
     }
 
+    // ---------------------------
+    // âœ… ëœë¤ ì…ë ¥ ì‹œí€€ìŠ¤ ìƒì„±
+    // ---------------------------
     private void BuildSequence(int len)
     {
         _seq.Clear();
@@ -153,13 +152,15 @@ public class ParrySequenceSystem : MonoBehaviour
         }
     }
 
-    // ---------- UI »ı¼º/Ç¥½Ã ----------
+    // =============================
+    // âœ… UI ì‹œìŠ¤í…œ
+    // =============================
     private void EnsureUI()
     {
         if (_canvas != null && _title != null && _sequence != null && _timerBar != null)
             return;
 
-        // Canvas »ı¼º
+        // Canvas ìƒì„±
         if (_canvas == null)
         {
             var c = new GameObject("ParrySequenceCanvas");
@@ -174,13 +175,10 @@ public class ParrySequenceSystem : MonoBehaviour
             DontDestroyOnLoad(c);
         }
 
-        // ÆùÆ® È®º¸
+        // âœ… Font í™•ë³´
         Font fontToUse = overrideFont;
         if (fontToUse == null)
-        {
-            // Unity 6: Arial.ttf ´ë½Å LegacyRuntime.ttf »ç¿ë
             fontToUse = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        }
 
         // Title
         if (_title == null)
@@ -189,14 +187,13 @@ public class ParrySequenceSystem : MonoBehaviour
             _title.text = "PARRY SEQUENCE";
         }
 
-        // Sequence
+        // Sequence í‘œì‹œ
         if (_sequence == null)
         {
             _sequence = CreateText("Sequence", _canvas.transform, new Vector2(0.5f, 0.7f), 24, TextAnchor.MiddleCenter, fontToUse);
-            _sequence.text = "";
         }
 
-        // TimerBar
+        // Timer Bar
         if (_timerBar == null)
         {
             GameObject bar = new GameObject("TimerBar");
@@ -204,7 +201,7 @@ public class ParrySequenceSystem : MonoBehaviour
             _timerBar = bar.AddComponent<Image>();
             _timerBar.raycastTarget = false;
 
-            var rect = bar.GetComponent<RectTransform>();
+            var rect = _timerBar.rectTransform;
             rect.anchorMin = new Vector2(0.25f, 0.65f);
             rect.anchorMax = new Vector2(0.75f, 0.67f);
             rect.offsetMin = Vector2.zero;
@@ -222,7 +219,7 @@ public class ParrySequenceSystem : MonoBehaviour
         txt.fontSize = fontSize;
         txt.alignment = align;
 
-        var rt = go.GetComponent<RectTransform>();
+        var rt = txt.rectTransform;
         rt.anchorMin = anchor;
         rt.anchorMax = anchor;
         rt.pivot = new Vector2(0.5f, 0.5f);
@@ -241,6 +238,9 @@ public class ParrySequenceSystem : MonoBehaviour
         if (_canvas != null) _canvas.enabled = false;
     }
 
+    // ---------------------------
+    // âœ… í˜„ì¬ ì§„í–‰ ìƒí™© í‘œì‹œ
+    // ---------------------------
     private void RenderSequenceProgress()
     {
         if (_sequence == null || _seq == null) return;
@@ -259,12 +259,17 @@ public class ParrySequenceSystem : MonoBehaviour
         _sequence.text = sb.ToString();
     }
 
+    // ---------------------------
+    // âœ… íƒ€ì´ë¨¸ ë°” ì—…ë°ì´íŠ¸
+    // ---------------------------
     private void UpdateTimerBar(float t01)
     {
         if (_timerBar == null) return;
         var rt = _timerBar.rectTransform;
-        float minX = 0.25f, maxX = 0.75f;
+        float minX = 0.25f;
+        float maxX = 0.75f;
         float x = Mathf.Lerp(minX, maxX, t01);
+
         rt.anchorMin = new Vector2(minX, rt.anchorMin.y);
         rt.anchorMax = new Vector2(x, rt.anchorMax.y);
         rt.offsetMin = Vector2.zero;

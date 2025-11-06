@@ -494,6 +494,7 @@
 "Assets/Main/Scripts/Enemy/EnemyHealth.cs"
 "Assets/Main/Scripts/Enemy/EnemyTier.cs"
 "Assets/Main/Scripts/Managers/EnemyHealthBar.cs"
+"Assets/Main/Scripts/Managers/FeverSequenceSystem.cs"
 "Assets/Main/Scripts/Managers/ParrySequenceSystem.cs"
 "Assets/Main/Scripts/Managers/ParrySequenceTestStarter.cs"
 "Assets/Main/Scripts/Managers/PlayerParryBridge.cs"
@@ -506,6 +507,7 @@
 "Assets/Main/Scripts/Player/PlayerStats.cs"
 "Assets/Main/Scripts/StageMove/SceneTransition.cs"
 "Assets/Main/Scripts/StageMove/StagePortal.cs"
+"Assets/Main/Scripts/System/MusicManager.cs"
 -langversion:9.0
 /deterministic
 /optimize+
