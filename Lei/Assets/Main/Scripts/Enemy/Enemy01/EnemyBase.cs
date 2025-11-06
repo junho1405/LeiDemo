@@ -1,151 +1,220 @@
+using System.Collections;
 using UnityEngine;
-using static Balance;
 
+[DisallowMultipleComponent]
 [RequireComponent(typeof(Animator))]
 [RequireComponent(typeof(Rigidbody2D))]
-[RequireComponent(typeof(Collider2D))]
 public class EnemyBase : MonoBehaviour
 {
-    [Header("Tier")]
-    public EnemyTier tier = EnemyTier.Normal; // ★ 일반/엘리트/보스 구분
+    [Header("Detect / Move")]
+    [SerializeField] protected float detectRange = 8f;
+    [SerializeField] protected float attackRange = 2.8f;
+    [SerializeField] protected float moveSpeed = 2.0f;
+    [SerializeField] protected bool faceToTarget = true;
 
+    [Header("Animator Param Names")]
+    [SerializeField] protected string attackTriggerName = "Attack1";
+    [SerializeField] protected string runBoolName = "isRunning";
+
+    [Header("Attack Timing")]
+    [SerializeField] protected float attackCooldown = 1.2f;
+    [SerializeField] protected float attackAnimMaxTime = 1.0f;
+
+    [Header("Stats / Tier")]
+    public EnemyTier tier = EnemyTier.Normal;
     public EnemyStats stats;
-    protected Animator anim;
-    protected Transform player;
-    protected Rigidbody2D rb;
-    protected Collider2D col;
 
-    [Header("AI Settings")]
-    public float detectionRange = 8f;
-    public float attackRange = 2.5f;
-    protected bool isDead = false;
-    protected bool isAttacking = false;
-
-    public int CurrentHP => stats != null ? stats.currentHP : 0;
-    public int MaxHP => stats != null ? stats.maxHP : 0;
-
-    public virtual bool HasStagger => false;
-    public virtual float CurrentStagger => 0f;
-    public virtual float MaxStagger => 0f;
-
-    [Header("Hitbox (AnimationEvent 래퍼용)")]
+    [Header("Refs")]
     [SerializeField] protected EnemyAttackHitbox attackHitbox;
+    [SerializeField] protected Transform target;
+    [SerializeField] protected EnemyHealth health;
+
+    protected Animator animator;
+    protected Rigidbody2D rb;
+    protected bool isAttacking = false;
+    protected float nextAttackTime = 0f;
+
+    // 하위호환 별칭/프로퍼티
+    protected Animator anim => animator;
+    protected Transform player { get => target; set => target = value; }
+    public float detectionRange { get => detectRange; set => detectRange = value; }
+    public bool isDead => (health != null && health.IsDead);
+
+    // Stagger 프록시
+    public float CurrentStagger => stats != null ? stats.currentStagger : 0f;
+    public float MaxStagger => stats != null ? stats.maxStagger : 0f;
+    public bool HasStagger => stats != null && stats.currentStagger > 0f;
+
+    protected virtual void Awake()
+    {
+        animator = GetComponent<Animator>();
+        rb = GetComponent<Rigidbody2D>();
+        if (attackHitbox == null) attackHitbox = GetComponentInChildren<EnemyAttackHitbox>(true);
+        if (health == null) health = GetComponent<EnemyHealth>();
+        if (stats == null) stats = GetComponent<EnemyStats>();
+    }
 
     protected virtual void Start()
     {
-        anim = GetComponent<Animator>();
-        rb = GetComponent<Rigidbody2D>();
-        col = GetComponent<Collider2D>();
-        stats = new EnemyStats();
-        stats.Init();
-
-        if (attackHitbox == null)
-            attackHitbox = GetComponentInChildren<EnemyAttackHitbox>(true);
-
-        rb.gravityScale = 0;
-        rb.constraints = RigidbodyConstraints2D.FreezeRotation;
-        rb.bodyType = RigidbodyType2D.Kinematic;
-        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        col.isTrigger = true;
-
-        InvokeRepeating(nameof(FindPlayer), 0f, 1f);
-    }
-
-    void FindPlayer()
-    {
-        var hk = Object.FindFirstObjectByType<HeroKnight>();
-        if (hk != null)
+        if (target == null)
         {
-            player = hk.transform;
-            CancelInvoke(nameof(FindPlayer));
-            Debug.Log($"{gameObject.name} found player: {player.name}");
+            var playerGo = GameObject.FindGameObjectWithTag("Player");
+            if (playerGo != null) target = playerGo.transform;
         }
+        RefreshAnimatorParamCache();
     }
 
     protected virtual void Update()
     {
-        if (isDead || player == null) return;
+        if (target == null || isDead) return;
 
-        Vector2 enemyPos = new Vector2(transform.position.x, 0);
-        Vector2 playerPos = new Vector2(player.position.x, 0);
-        float distance = Vector2.Distance(enemyPos, playerPos);
+        float dist = Vector2.Distance(transform.position, target.position);
 
-        if (isAttacking) { rb.linearVelocity = Vector2.zero; return; }
-
-        if (distance <= attackRange)
+        if (dist > detectRange)
         {
-            rb.linearVelocity = Vector2.zero;
-            Attack();
+            SetRun(false);
+            return;
         }
-        else if (distance <= detectionRange)
+
+        if (isAttacking)
         {
-            MoveTowardsPlayer();
+            FaceToTargetIfNeeded();
+            SetRun(false);
+            return;
+        }
+
+        if (dist > attackRange)
+        {
+            MoveToward(target.position);
+        }
+        else if (Time.time >= nextAttackTime)
+        {
+            StartCoroutine(AttackRoutine());
         }
         else
         {
-            Idle();
+            SetRun(false);
         }
     }
 
-    protected virtual void Idle()
+    // ---------- 이동/방향 ----------
+    protected void MoveToward(Vector3 goal)
     {
-        rb.linearVelocity = Vector2.zero;
-        anim.Play("Goblin_Idle");
+        Vector2 dir = (goal - transform.position).normalized;
+        rb.linearVelocity = new Vector2(dir.x * moveSpeed, rb.linearVelocity.y);
+        FaceToTargetIfNeeded();
+        SetRun(Mathf.Abs(rb.linearVelocity.x) > 0.05f);
     }
 
-    protected virtual void MoveTowardsPlayer()
+    protected void SetRun(bool running)
     {
-        if (isAttacking) return;
-
-        anim.Play("Goblin_Run");
-
-        float dirX = Mathf.Sign(player.position.x - transform.position.x);
-        rb.linearVelocity = new Vector2(dirX * stats.moveSpeed, 0);
-
-        if (dirX > 0) transform.localScale = new Vector3(5, 5, 1);
-        else transform.localScale = new Vector3(-5, 5, 1);
+        if (!string.IsNullOrEmpty(runBoolName))
+            animator.SetBool(runBoolName, running);
+        if (!running)
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
     }
 
-    protected virtual void Attack()
+    protected void FaceToTargetIfNeeded()
     {
-        if (isAttacking) return;
+        if (!faceToTarget || target == null) return;
+        float dx = target.position.x - transform.position.x;
+        if (Mathf.Abs(dx) > 0.0001f)
+        {
+            Vector3 s = transform.localScale;
+            s.x = Mathf.Abs(s.x) * Mathf.Sign(dx);
+            transform.localScale = s;
+        }
+    }
 
+    // ---------- 공격 루틴 ----------
+    protected virtual IEnumerator AttackRoutine()
+    {
         isAttacking = true;
-        rb.linearVelocity = Vector2.zero;
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        SetRun(false);
 
-        int pattern = Random.Range(0, 2);
-        string animName = pattern == 0 ? "Goblin_Attack1" : "Goblin_Attack2";
-        Debug.Log($"{gameObject.name} 공격 발동! ({animName})");
+        animator.ResetTrigger(attackTriggerName);
+        animator.SetTrigger(attackTriggerName);
 
-        anim.Play(animName);
+        float t = 0f;
+        while (t < attackAnimMaxTime && isAttacking)
+        {
+            t += Time.deltaTime;
+            yield return null;
+        }
 
-        Invoke(nameof(EndAttack), 1.0f);
+        if (isAttacking) EndAttack();
     }
 
-    protected void EndAttack() { isAttacking = false; }
+    public virtual void EnableHitbox() => attackHitbox?.EnableHitbox();
+    public virtual void DisableHitbox() => attackHitbox?.DisableHitbox();
 
-    // ★ 배율 적용: 플레이어의 공격이 들어올 때
-    public virtual void TakeDamage(int rawDamage)
+    public virtual void EndAttack()
     {
-        // 플레이어가 준 피해에 티어별 “받는 피해” 배율 적용
-        int adjusted = Mathf.RoundToInt(rawDamage * Balance.IncomingDamageMultiplier(tier));
-        stats.TakeDamage(adjusted);
-        anim.Play("Goblin_Hit");
-
-        if (stats.IsDead()) Die();
+        isAttacking = false;
+        nextAttackTime = Time.time + attackCooldown;
     }
 
-    protected virtual void Die()
+    // ---------- 데미지/경직 ----------
+    public virtual void TakeDamage(int dmg)
     {
-        isDead = true;
-        rb.linearVelocity = Vector2.zero;
-        anim.Play("Goblin_Death");
-        Destroy(gameObject, 2f);
+        if (health != null)
+        {
+            health.TakeDamage(dmg);
+            Debug.Log($"<color=yellow>[Enemy] 피해 {dmg}</color>");
+        }
     }
 
-    public void SetPlayer(Transform p) { player = p; }
+    // 패링 성공용 (트루 대미지 + 패링 전용 경직 감소)
+    public virtual void TakeTrueDamage(int dmg, float staggerBonusMultiplier = 1.5f)
+    {
+        if (health != null)
+            health.TakeDamage(dmg);
+        else if (stats != null)
+            stats.currentHP = Mathf.Max(0, stats.currentHP - dmg);
 
-    // --- AnimationEvent 래퍼 ---
-    public void EnableHitbox() => attackHitbox?.EnableHitbox();
-    public void DisableHitbox() => attackHitbox?.DisableHitbox();
+        if (stats != null)
+        {
+            float staggerDmg = Mathf.Max(1f, dmg * Mathf.Abs(staggerBonusMultiplier));
+            stats.currentStagger = Mathf.Max(0f, stats.currentStagger - staggerDmg);
+            Debug.Log($"<color=#FFAA00>[Parry] 트루대미지 {dmg}, 경직도 -{staggerDmg}</color>");
+        }
+    }
+
+    // 기존 호환(일반 공격에서 호출 금지 권장)
+    public virtual void ReduceStagger(float v)
+    {
+        if (stats == null) return;
+        stats.currentStagger = Mathf.Max(0f, stats.currentStagger - Mathf.Abs(v));
+    }
+
+    public virtual void ReduceStaggerFromParry(float v)
+    {
+        if (stats == null) return;
+        stats.currentStagger = Mathf.Max(0f, stats.currentStagger - Mathf.Abs(v));
+        Debug.Log($"<color=orange>[Stagger] 패링 경직도 {v} 감소</color>");
+    }
+
+    // ---------- 기본 상태 ----------
+    public virtual void Attack() { }
+    public virtual void Idle() { }
+    public virtual void MoveTowardsPlayer() { }
+
+    public virtual void Die()
+    {
+        if (health != null)
+        {
+            health.Die();
+        }
+        else
+        {
+            Debug.Log($"<color=red>[EnemyBase] {name} 사망 → 오브젝트 비활성화</color>");
+            gameObject.SetActive(false);
+        }
+    }
+
+    // ---------- 유틸 ----------
+    public void SetPlayer(Transform t) => target = t;
+
+    protected void RefreshAnimatorParamCache() { /* 파라미터 캐시 생략(호환) */ }
 }

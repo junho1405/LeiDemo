@@ -81,6 +81,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2a8bdc7f41b704693ad497097f30dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  detectLayers:
+    serializedVersion: 2
+    m_Bits: 1024
+  ignoreTriggerColliders: 1
 --- !u!1 &1635104288366176409
 GameObject:
   m_ObjectHideFlags: 0
@@ -162,6 +166,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2a8bdc7f41b704693ad497097f30dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  detectLayers:
+    serializedVersion: 2
+    m_Bits: 1024
+  ignoreTriggerColliders: 1
 --- !u!1 &1901209827055934660
 GameObject:
   m_ObjectHideFlags: 0
@@ -243,6 +251,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2a8bdc7f41b704693ad497097f30dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  detectLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  ignoreTriggerColliders: 1
 --- !u!1 &3059250461821974621
 GameObject:
   m_ObjectHideFlags: 0
@@ -258,6 +270,7 @@ GameObject:
   - component: {fileID: 6890298062676418136}
   - component: {fileID: 7359297461026602309}
   - component: {fileID: 3454236654000644972}
+  - component: {fileID: -9172077024377882396}
   m_Layer: 6
   m_Name: HeroKnight
   m_TagString: Player
@@ -453,6 +466,9 @@ MonoBehaviour:
   m_rollForce: 6
   m_noBlood: 0
   m_slideDust: {fileID: 1038168246061390451, guid: 8b8c8cc6774fb074cb9139cc631b108e, type: 3}
+  parryCooldown: 4
+  parryCounterDamage: 30
+  parryStaggerDamage: 50
 --- !u!114 &3454236654000644972
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -470,6 +486,19 @@ MonoBehaviour:
   successDamage: 40
   pool: 77000000610000007300000064000000
   overrideFont: {fileID: 0}
+--- !u!114 &-9172077024377882396
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3059250461821974621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef4f906a4a8e0a94c9be5b8f69522569, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fallbackWindow: 0.25
 --- !u!1 &5130395590531429150
 GameObject:
   m_ObjectHideFlags: 0
@@ -551,6 +580,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2a8bdc7f41b704693ad497097f30dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  detectLayers:
+    serializedVersion: 2
+    m_Bits: 1024
+  ignoreTriggerColliders: 1
 --- !u!1 &7408460007705127866
 GameObject:
   m_ObjectHideFlags: 0
@@ -632,6 +665,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2a8bdc7f41b704693ad497097f30dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  detectLayers:
+    serializedVersion: 2
+    m_Bits: 1024
+  ignoreTriggerColliders: 1
 --- !u!1 &8409275820277860338
 GameObject:
   m_ObjectHideFlags: 0
@@ -723,4 +760,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f595eafce4ef8874eb09ab38a441654d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Damage: 10
+  damage: 10
+  boxCol: {fileID: 0}

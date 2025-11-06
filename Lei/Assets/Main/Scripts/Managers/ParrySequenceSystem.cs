@@ -11,7 +11,8 @@ public class ParrySequenceSystem : MonoBehaviour
     [Header("Sequence Settings")]
     public int sequenceLength = 4;
     public float stepTime = 0.8f;
-    public int successDamage = 40;
+    public int successDamage = 40;          // 패링 성공 시 트루 대미지
+    public float staggerMultiplier = 1.5f;  // 경직도 감소 = successDamage * multiplier
     public KeyCode[] pool = new KeyCode[] { KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D };
 
     [Header("UI")]
@@ -43,7 +44,7 @@ public class ParrySequenceSystem : MonoBehaviour
 
     private void Start()
     {
-        EnsureUI();   // 폰트 문제로 실패하면 Begin()에서 한 번 더 시도
+        EnsureUI();
         HideUI();
     }
 
@@ -89,10 +90,9 @@ public class ParrySequenceSystem : MonoBehaviour
     {
         if (_running) StopSequence(false);
 
-        // UI가 아직 없었거나 이전에 실패했을 수도 있으니 재보장
-        EnsureUI();
-
+        EnsureUI(); // 폰트/캔버스 보장
         _currentTarget = target;
+
         int len = (length > 0) ? length : sequenceLength;
 
         BuildSequence(len);
@@ -100,11 +100,12 @@ public class ParrySequenceSystem : MonoBehaviour
         _timer = stepTime;
         _running = true;
 
-        Time.timeScale = 0f;
+        Time.timeScale = 0f; // 시퀀스 중 일시정지(언스케일드 타이머로 진행)
 
         ShowUI();
         RenderSequenceProgress();
         UpdateTimerBar(1f);
+        Debug.Log("<color=#00FFFF>[ParrySequence] 시작</color>");
     }
 
     public void ForceStop()
@@ -123,7 +124,20 @@ public class ParrySequenceSystem : MonoBehaviour
         if (success && _currentTarget != null)
         {
             var enemy = _currentTarget.GetComponent<EnemyBase>();
-            if (enemy != null) enemy.TakeDamage(successDamage);
+            if (enemy != null)
+            {
+                // ★ 패링 성공: 트루 대미지 + (패링 전용) 경직도 감소
+                enemy.TakeTrueDamage(successDamage, staggerMultiplier);
+                Debug.Log($"<color=#00FF99>[ParrySequence] 성공 → TrueDamage {successDamage}, Stagger x{staggerMultiplier}</color>");
+            }
+            else
+            {
+                Debug.Log("<color=orange>[ParrySequence] 성공했지만 EnemyBase 없음</color>");
+            }
+        }
+        else
+        {
+            Debug.Log("<color=#FF8888>[ParrySequence] 실패</color>");
         }
 
         _currentTarget = null;
@@ -140,7 +154,6 @@ public class ParrySequenceSystem : MonoBehaviour
     }
 
     // ---------- UI 생성/표시 ----------
-
     private void EnsureUI()
     {
         if (_canvas != null && _title != null && _sequence != null && _timerBar != null)
@@ -165,7 +178,7 @@ public class ParrySequenceSystem : MonoBehaviour
         Font fontToUse = overrideFont;
         if (fontToUse == null)
         {
-            // Unity 6: Arial.ttf는 더 이상 유효하지 않음 → LegacyRuntime.ttf 사용
+            // Unity 6: Arial.ttf 대신 LegacyRuntime.ttf 사용
             fontToUse = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
 

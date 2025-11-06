@@ -1,35 +1,35 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Animator))]
+[DisallowMultipleComponent]
 public class PlayerHealth : MonoBehaviour
 {
-    public PlayerStats stats;
-    private Animator anim;
-    private bool isDead = false;
+    [Header("Stats")]
+    public int maxHP = 100;
+    public int currentHP;
 
-    void Start()
+    [Header("FX")]
+    public GameObject hitEffect;
+
+    void Awake()
     {
-        anim = GetComponent<Animator>();
-        stats = new PlayerStats();
-        stats.Init();
+        currentHP = maxHP;
     }
 
     public void TakeDamage(int dmg)
     {
-        if (isDead) return;
+        currentHP = Mathf.Max(0, currentHP - dmg);
+        Debug.Log($"<color=red>[Player] 피해 {dmg} → 남은 HP {currentHP}</color>");
 
-        stats.TakeDamage(dmg);
-        Debug.Log($"플레이어 피해: {dmg}, 남은 HP: {stats.currentHP}");
+        if (hitEffect)
+            Instantiate(hitEffect, transform.position, Quaternion.identity);
 
-        anim.Play("HeroKnight_Hurt");
-
-        if (stats.IsDead()) Die();
+        if (currentHP <= 0)
+            Die();
     }
 
     void Die()
     {
-        isDead = true;
-        anim.Play("HeroKnight_Death");
-        Debug.Log("플레이어 사망");
+        Debug.Log("<color=red>[Player] 사망</color>");
+        // TODO: GameOver UI, 리스폰 등 후처리 추가 예정
     }
 }

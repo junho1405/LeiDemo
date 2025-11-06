@@ -1,68 +1,85 @@
 using UnityEngine;
-using static Balance;
 
-[RequireComponent(typeof(Collider2D))]
+[DisallowMultipleComponent]
+[RequireComponent(typeof(BoxCollider2D))]
 public class EnemyAttackHitbox : MonoBehaviour
 {
-    [Header("공격력 설정")]
-    public int damage = 10;
+    [Header("Damage")]
+    [SerializeField] private int damage = 10;
+    [SerializeField] private float applyCooldown = 0.25f; // 동일 대상 연타 방지
 
-    private bool canHit = false;
-    private Collider2D hitboxCollider;
-    private EnemyBase owner; // ★ 루트 적 참조 (티어/상태용)
+    [Header("Refs")]
+    [SerializeField] private BoxCollider2D boxCol;
 
-    void Awake()
+    private float _nextApplyTime;
+    private EnemyBase _owner;
+
+    private void Awake()
     {
-        hitboxCollider = GetComponent<Collider2D>();
-        hitboxCollider.isTrigger = true;
-        hitboxCollider.enabled = false; // 기본 비활성
-        owner = GetComponentInParent<EnemyBase>();
+        if (boxCol == null) boxCol = GetComponent<BoxCollider2D>();
+        boxCol.isTrigger = true;
+        boxCol.enabled = false;
+
+        _owner = GetComponentInParent<EnemyBase>();
     }
 
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (!canHit) return;
-
-        if (other.CompareTag("Player"))
-        {
-            // 패링 체크
-            HeroKnight player = other.GetComponent<HeroKnight>() ?? other.GetComponentInParent<HeroKnight>();
-            if (player != null && player.IsParryActive)
-            {
-                player.OnParrySuccess(transform.root.gameObject); // 적 루트 전달
-                return;
-            }
-
-            // 플레이어 피해 (티어별 “주는 피해” 배율 적용)
-            PlayerHealth playerHealth = other.GetComponent<PlayerHealth>() ?? other.GetComponentInParent<PlayerHealth>();
-            if (playerHealth != null)
-            {
-                float outMul = owner ? Balance.OutgoingDamageMultiplier(owner.tier) : 1f;
-                int final = Mathf.RoundToInt(damage * outMul);
-                playerHealth.TakeDamage(final);
-                Debug.Log($"플레이어 피격! {final} 데미지 (tier {(owner ? owner.tier : EnemyTier.Normal)})");
-            }
-        }
-    }
-
-    // --- Animation Event용 ---
+    // 애니메이션 이벤트에서 호출
     public void EnableHitbox()
     {
-        if (canHit) return; // 중복 가드
-        canHit = true;
-
-        // 재진입 보장
-        hitboxCollider.enabled = false;
-        hitboxCollider.enabled = true;
-        Debug.Log("<color=green>고블린 공격 판정 ON</color>");
+        if (boxCol == null) return;
+        boxCol.enabled = true;
+        Debug.Log("<color=gray>적 공격 판정 ON</color>");
     }
 
+    // 애니메이션 이벤트에서 호출
     public void DisableHitbox()
     {
-        if (!canHit) return; // 중복 가드
-        canHit = false;
+        if (boxCol == null) return;
+        boxCol.enabled = false;
+        Debug.Log("<color=gray>적 공격 판정 OFF</color>");
+    }
 
-        hitboxCollider.enabled = false;
-        Debug.Log("<color=gray>고블린 공격 판정 OFF</color>");
+    private void OnTriggerEnter2D(Collider2D other) => HandleHit(other);
+    private void OnTriggerStay2D(Collider2D other) => HandleHit(other);
+
+    private void HandleHit(Collider2D other)
+    {
+        if (!boxCol.enabled) return;
+        if (Time.time < _nextApplyTime) return;
+        if (!other.CompareTag("Player")) return;
+
+        // 1) 패링 창 체크
+        var parry = other.GetComponent<PlayerParryBridge>();
+        if (parry != null && parry.IsWindowActive)
+        {
+            // 공격 취소 + 히트박스 OFF + 재적용 쿨다운 + 시퀀스 시작
+            _owner?.EndAttack();
+            DisableHitbox();
+            _nextApplyTime = Time.time + applyCooldown;
+
+            if (ParrySequenceSystem.Instance != null && _owner != null)
+            {
+                ParrySequenceSystem.Instance.Begin(_owner.transform);
+                Debug.Log("<color=#00E5FF>[Parry] SUCCESS → 시퀀스 시작</color>");
+            }
+            else
+            {
+                Debug.Log("<color=#00E5FF>[Parry] SUCCESS (시퀀스 없음)</color>");
+            }
+            return;
+        }
+
+        // 2) 일반 피격
+        var hp = other.GetComponent<PlayerHealth>();
+        if (hp != null)
+        {
+            hp.TakeDamage(damage);
+            _nextApplyTime = Time.time + applyCooldown;
+            Debug.Log($"<color=yellow>플레이어 피격 {damage}</color>");
+        }
+        else
+        {
+            Debug.Log("<color=orange>PlayerHealth 없음 → 데미지 미적용</color>");
+        }
     }
 }
