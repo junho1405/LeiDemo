@@ -7,134 +7,139 @@ using UnityEngine;
 public class EnemyBase : MonoBehaviour
 {
     [Header("Detect / Move")]
-    [SerializeField] protected float detectRange = 8f;
-    [SerializeField] protected float attackRange = 2.8f;
-    [SerializeField] protected float moveSpeed = 2.0f;
-    [SerializeField] protected bool faceToTarget = true;
+    public float detectRange = 8f;
+    public float attackRange = 1.8f;
+    public float moveSpeed = 2.5f;
+    public bool faceToTarget = true;
 
     [Header("Animator Param Names")]
-    [SerializeField] protected string attackTriggerName = "Attack1";
-    [SerializeField] protected string runBoolName = "isRunning";
+    public string attackTriggerName = "Attack1";
+    public string runBoolName = "isRunning";
 
     [Header("Attack Timing")]
-    [SerializeField] protected float attackCooldown = 1.2f;
-    [SerializeField] protected float attackAnimMaxTime = 1.0f;
+    public float attackCooldown = 1.2f;
+    public float attackAnimMaxTime = 1.0f;
 
-    [Header("Stats / Tier")]
+    [Header("Stats / References")]
     public EnemyTier tier = EnemyTier.Normal;
-    public EnemyStats stats;
+    public EnemyStats stats;            // HP / Stagger / Fever 플래그
+    public EnemyHealth health;          // HP 감소
+    public EnemyAttackHitbox attackHitbox;
+    public Transform target;
 
-    [Header("Refs")]
-    [SerializeField] protected EnemyAttackHitbox attackHitbox;
-    [SerializeField] protected Transform target;
-    [SerializeField] protected EnemyHealth health;
+    [Header("Fever Time Settings")]
+    public float feverDuration = 10f;          // 지속시간(초)
+    public float feverDamageMultiplier = 1.5f; // 피버 중 피해 배율
 
     protected Animator animator;
     protected Rigidbody2D rb;
     protected bool isAttacking = false;
     protected float nextAttackTime = 0f;
 
-    // 하위호환 별칭/프로퍼티
-    protected Animator anim => animator;
-    protected Transform player { get => target; set => target = value; }
-    public float detectionRange { get => detectRange; set => detectRange = value; }
-    public bool isDead => (health != null && health.IsDead);
+    bool _hasRunBool;
+    bool _hasAttackTrigger;
 
-    // Stagger 프록시
-    public float CurrentStagger => stats != null ? stats.currentStagger : 0f;
-    public float MaxStagger => stats != null ? stats.maxStagger : 0f;
-    public bool HasStagger => stats != null && stats.currentStagger > 0f;
+    public float CurrentStagger => (stats != null) ? stats.currentStagger : 0f;
+    public float MaxStagger => (stats != null) ? stats.maxStagger : 0f;
 
     protected virtual void Awake()
     {
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
-        if (attackHitbox == null) attackHitbox = GetComponentInChildren<EnemyAttackHitbox>(true);
         if (health == null) health = GetComponent<EnemyHealth>();
         if (stats == null) stats = GetComponent<EnemyStats>();
+        if (attackHitbox == null) attackHitbox = GetComponentInChildren<EnemyAttackHitbox>(true);
     }
 
     protected virtual void Start()
     {
         if (target == null)
         {
-            var playerGo = GameObject.FindGameObjectWithTag("Player");
-            if (playerGo != null) target = playerGo.transform;
+            var p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) target = p.transform;
         }
         RefreshAnimatorParamCache();
     }
 
     protected virtual void Update()
     {
-        if (target == null || isDead) return;
+        // ✅ HP가 0이 되어 EnemyHealth.IsDead 가 true면 즉시 제거
+        if (health != null && health.IsDead)
+        {
+            Die();
+            return;
+        }
+
+        if (target == null) return;
+
+        // ✅ 피버 중에는 이동/공격 정지
+        if (stats != null && stats.isInFever)
+        {
+            rb.linearVelocity = Vector2.zero;
+            SetRun(false);
+            return;
+        }
 
         float dist = Vector2.Distance(transform.position, target.position);
 
         if (dist > detectRange)
         {
-            SetRun(false);
+            Idle();
             return;
         }
 
         if (isAttacking)
         {
-            FaceToTargetIfNeeded();
+            FaceTarget();
             SetRun(false);
             return;
         }
 
         if (dist > attackRange)
         {
-            MoveToward(target.position);
+            MoveTowardsPlayer();
+            return;
         }
-        else if (Time.time >= nextAttackTime)
-        {
+
+        if (Time.time >= nextAttackTime)
             StartCoroutine(AttackRoutine());
-        }
         else
-        {
             SetRun(false);
-        }
     }
 
-    // ---------- 이동/방향 ----------
-    protected void MoveToward(Vector3 goal)
+    // --- 행동 ---
+    public virtual void Idle()
     {
-        Vector2 dir = (goal - transform.position).normalized;
+        SetRun(false);
+    }
+
+    public virtual void MoveTowardsPlayer()
+    {
+        if (target == null) return;
+
+        Vector2 dir = (target.position - transform.position).normalized;
         rb.linearVelocity = new Vector2(dir.x * moveSpeed, rb.linearVelocity.y);
-        FaceToTargetIfNeeded();
+
+        FaceTarget();
         SetRun(Mathf.Abs(rb.linearVelocity.x) > 0.05f);
     }
 
-    protected void SetRun(bool running)
+    public virtual void Attack()
     {
-        if (!string.IsNullOrEmpty(runBoolName))
-            animator.SetBool(runBoolName, running);
-        if (!running)
-            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-    }
-
-    protected void FaceToTargetIfNeeded()
-    {
-        if (!faceToTarget || target == null) return;
-        float dx = target.position.x - transform.position.x;
-        if (Mathf.Abs(dx) > 0.0001f)
+        if (_hasAttackTrigger)
         {
-            Vector3 s = transform.localScale;
-            s.x = Mathf.Abs(s.x) * Mathf.Sign(dx);
-            transform.localScale = s;
+            animator.ResetTrigger(attackTriggerName);
+            animator.SetTrigger(attackTriggerName);
         }
     }
 
-    // ---------- 공격 루틴 ----------
     protected virtual IEnumerator AttackRoutine()
     {
         isAttacking = true;
-        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
         SetRun(false);
 
-        animator.ResetTrigger(attackTriggerName);
-        animator.SetTrigger(attackTriggerName);
+        Attack();
 
         float t = 0f;
         while (t < attackAnimMaxTime && isAttacking)
@@ -143,11 +148,9 @@ public class EnemyBase : MonoBehaviour
             yield return null;
         }
 
-        if (isAttacking) EndAttack();
+        if (isAttacking)
+            EndAttack();
     }
-
-    public virtual void EnableHitbox() => attackHitbox?.EnableHitbox();
-    public virtual void DisableHitbox() => attackHitbox?.DisableHitbox();
 
     public virtual void EndAttack()
     {
@@ -155,66 +158,129 @@ public class EnemyBase : MonoBehaviour
         nextAttackTime = Time.time + attackCooldown;
     }
 
-    // ---------- 데미지/경직 ----------
-    public virtual void TakeDamage(int dmg)
+    public virtual void EnableHitbox()
     {
-        if (health != null)
-        {
-            health.TakeDamage(dmg);
-            Debug.Log($"<color=yellow>[Enemy] 피해 {dmg}</color>");
-        }
+        if (attackHitbox) attackHitbox.EnableHitbox();
     }
 
-    // 패링 성공용 (트루 대미지 + 패링 전용 경직 감소)
-    public virtual void TakeTrueDamage(int dmg, float staggerBonusMultiplier = 1.5f)
+    public virtual void DisableHitbox()
     {
-        if (health != null)
-            health.TakeDamage(dmg);
-        else if (stats != null)
-            stats.currentHP = Mathf.Max(0, stats.currentHP - dmg);
+        if (attackHitbox) attackHitbox.DisableHitbox();
+    }
+
+    // --- 데미지 ---
+    public virtual void TakeDamage(int dmg)
+    {
+        if (stats != null && stats.isInFever)
+            dmg = Mathf.RoundToInt(dmg * feverDamageMultiplier);
+
+        if (health != null) health.TakeDamage(dmg);
+        if (stats != null) stats.currentHP = Mathf.Max(0, stats.currentHP - dmg);
+
+        if (stats != null && stats.currentHP <= 0)
+            Die();
+    }
+
+    public virtual void TakeParryDamage(int dmg, float staggerReduce)
+    {
+        if (stats != null && stats.isInFever)
+            dmg = Mathf.RoundToInt(dmg * feverDamageMultiplier);
+
+        if (health != null) health.TakeDamage(dmg);
 
         if (stats != null)
         {
-            float staggerDmg = Mathf.Max(1f, dmg * Mathf.Abs(staggerBonusMultiplier));
-            stats.currentStagger = Mathf.Max(0f, stats.currentStagger - staggerDmg);
-            Debug.Log($"<color=#FFAA00>[Parry] 트루대미지 {dmg}, 경직도 -{staggerDmg}</color>");
+            stats.currentStagger = Mathf.Max(0, stats.currentStagger - Mathf.Abs(staggerReduce));
+            if (stats.currentStagger <= 0f && !stats.isInFever)
+                TriggerFeverMode();
         }
     }
 
-    // 기존 호환(일반 공격에서 호출 금지 권장)
     public virtual void ReduceStagger(float v)
     {
         if (stats == null) return;
-        stats.currentStagger = Mathf.Max(0f, stats.currentStagger - Mathf.Abs(v));
+        stats.currentStagger = Mathf.Max(0, stats.currentStagger - Mathf.Abs(v));
+
+        if (stats.currentStagger <= 0f && !stats.isInFever)
+            TriggerFeverMode();
     }
 
-    public virtual void ReduceStaggerFromParry(float v)
+    // ✅ 피버타임 전용 데미지 (FeverSequenceSystem에서 호출)
+    public virtual void TakeFeverDamage(int dmg)
     {
-        if (stats == null) return;
-        stats.currentStagger = Mathf.Max(0f, stats.currentStagger - Mathf.Abs(v));
-        Debug.Log($"<color=orange>[Stagger] 패링 경직도 {v} 감소</color>");
+        if (health != null) health.TakeDamage(dmg);
+        if (stats != null) stats.currentHP = Mathf.Max(0, stats.currentHP - dmg);
+
+        if (stats != null && stats.currentHP <= 0)
+            Die();
     }
 
-    // ---------- 기본 상태 ----------
-    public virtual void Attack() { }
-    public virtual void Idle() { }
-    public virtual void MoveTowardsPlayer() { }
-
-    public virtual void Die()
+    // --- Fever ---
+    public void TriggerFeverMode()
     {
-        if (health != null)
+        if (stats == null || stats.isInFever) return;
+
+        // 발동 즉시 경직도 풀회복
+        stats.currentStagger = stats.maxStagger;
+        stats.isInFever = true;
+
+        // 이동/공격 잠금
+        isAttacking = false;
+        rb.linearVelocity = Vector2.zero;
+
+        FeverSequenceSystem.Instance?.BeginFever(this, feverDuration);
+    }
+
+    public void ExitFeverTime()
+    {
+        if (stats != null) stats.isInFever = false;
+    }
+
+    // --- 기타 ---
+    protected virtual void Die()
+    {
+        // 피버 중이었다면 강제 종료
+        FeverSequenceSystem.Instance?.ForceStopFeverBy(this);
+
+        if (health != null) health.Die();
+
+        // 즉시 제거
+        gameObject.SetActive(false);
+    }
+
+    protected void SetRun(bool running)
+    {
+        if (_hasRunBool) animator.SetBool(runBoolName, running);
+        if (!running) rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+    }
+
+    protected void FaceTarget()
+    {
+        if (!faceToTarget || target == null) return;
+
+        float dx = target.position.x - transform.position.x;
+        if (Mathf.Abs(dx) > 0.001f)
         {
-            health.Die();
-        }
-        else
-        {
-            Debug.Log($"<color=red>[EnemyBase] {name} 사망 → 오브젝트 비활성화</color>");
-            gameObject.SetActive(false);
+            Vector3 s = transform.localScale;
+            s.x = Mathf.Abs(s.x) * Mathf.Sign(dx);
+            transform.localScale = s;
         }
     }
 
-    // ---------- 유틸 ----------
+    protected void RefreshAnimatorParamCache()
+    {
+        _hasRunBool = HasAnimatorParam(animator, runBoolName, AnimatorControllerParameterType.Bool);
+        _hasAttackTrigger = HasAnimatorParam(animator, attackTriggerName, AnimatorControllerParameterType.Trigger);
+    }
+
+    static bool HasAnimatorParam(Animator anim, string name, AnimatorControllerParameterType type)
+    {
+        if (anim == null || string.IsNullOrEmpty(name)) return false;
+        foreach (var p in anim.parameters)
+            if (p.name == name && p.type == type) return true;
+        return false;
+    }
+
+    // PlayerSpawner에서 호출
     public void SetPlayer(Transform t) => target = t;
-
-    protected void RefreshAnimatorParamCache() { /* 파라미터 캐시 생략(호환) */ }
 }

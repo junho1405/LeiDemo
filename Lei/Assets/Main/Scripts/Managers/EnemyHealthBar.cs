@@ -61,7 +61,7 @@ public class EnemyHealthBar : MonoBehaviour
         LayoutStatic();
         UpdateBarImmediate();
 
-        // 부모 스케일 보정 (스케일 5 같은 경우 대비)
+        // 부모 스케일 보정
         root.localScale = Vector3.one * (1f / Mathf.Max(0.0001f, transform.lossyScale.x));
     }
 
@@ -98,7 +98,6 @@ public class EnemyHealthBar : MonoBehaviour
         root.rotation = Quaternion.identity;
 
         root.position = new Vector3(transform.position.x, GetTopY() + yOffset, 0f);
-
         UpdateBarImmediate();
     }
 
@@ -126,7 +125,6 @@ public class EnemyHealthBar : MonoBehaviour
 
         float ratio = Mathf.Clamp01(maxHPf <= 0f ? 0f : (curHPf / maxHPf));
 
-        // 색상: 저체력일수록 빨강으로
         srFill.color = Color.Lerp(fillLow, fillHigh, ratio);
         if (ratio <= lowHpThreshold)
         {

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class PlayerSpawner : MonoBehaviour
 {
@@ -10,11 +10,12 @@ public class PlayerSpawner : MonoBehaviour
         {
             GameObject player = Instantiate(playerPrefab);
             player.name = "HeroKnight";
-            DontDestroyOnLoad(player);
             player.tag = "Player";
+            DontDestroyOnLoad(player);
 
             var enemies = Object.FindObjectsByType<EnemyBase>(FindObjectsSortMode.None);
-            foreach (var enemy in enemies) enemy.SetPlayer(player.transform);
+            foreach (var e in enemies)
+                e.SetPlayer(player.transform);   // ✅ EnemyBase에 SetPlayer 존재
         }
     }
 }

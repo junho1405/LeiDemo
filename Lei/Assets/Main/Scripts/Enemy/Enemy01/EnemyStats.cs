@@ -1,37 +1,38 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 [DisallowMultipleComponent]
 public class EnemyStats : MonoBehaviour
 {
-    [Header("HP (Fallback)")]
-    public float maxHP = 100f;      // EnemyHealth ¾øÀ» ¶§¸¸ Ã¼·Â¹Ù°¡ ÀÌ °ªÀ» ÀĞÀ½
-    public float currentHP = 100f;
+    [Header("HP")]
+    public int maxHP = 100;
+    public int currentHP = 100;
 
     [Header("Stagger")]
     public float maxStagger = 30f;
     public float currentStagger = 30f;
 
-    private void Awake()
-    {
-        if (maxHP <= 0f) maxHP = 1f;
-        currentHP = Mathf.Clamp(currentHP <= 0f ? maxHP : currentHP, 0f, maxHP);
+    [Header("Fever Flag")]
+    public bool isInFever = false;
 
-        if (maxStagger < 0f) maxStagger = 0f;
-        currentStagger = Mathf.Clamp(currentStagger < 0f ? maxStagger : currentStagger, 0f, maxStagger);
+    EnemyBase owner;
+
+    void Awake()
+    {
+        owner = GetComponent<EnemyBase>();
+        currentHP = Mathf.Clamp(currentHP, 0, maxHP);
+        currentStagger = Mathf.Clamp(currentStagger, 0, maxStagger);
     }
 
-    public void ReduceStagger(float value)
+    // í•„ìš”ì‹œ ì™¸ë¶€ì—ì„œ í˜¸ì¶œ
+    public void ReduceStagger(float v)
     {
-        if (maxStagger <= 0f) return;
-        float v = Mathf.Abs(value);
-        float before = currentStagger;
-        currentStagger = Mathf.Max(0f, currentStagger - v);
-        if (!Mathf.Approximately(before, currentStagger))
-            Debug.Log($"<color=#FFA500>[Stagger] -{v} => {currentStagger}/{maxStagger}</color>");
+        currentStagger = Mathf.Max(0, currentStagger - Mathf.Abs(v));
+        if (currentStagger <= 0f && !isInFever && owner != null)
+            owner.TriggerFeverMode();
     }
 
-    public void ResetStagger()
+    public void HealStagger(float v)
     {
-        currentStagger = maxStagger;
+        currentStagger = Mathf.Min(maxStagger, currentStagger + Mathf.Abs(v));
     }
 }
